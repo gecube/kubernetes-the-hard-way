@@ -18,11 +18,9 @@ gcloud compute ssh worker-0
 
 Install the OS dependencies:
 
-```
-{
+```bash
   sudo apt-get update
   sudo apt-get -y install socat conntrack ipset
-}
 ```
 
 > The socat binary enables support for the `kubectl port-forward` command.
@@ -33,13 +31,13 @@ By default the kubelet will fail to start if [swap](https://help.ubuntu.com/comm
 
 Verify if swap is enabled:
 
-```
+```bash
 sudo swapon --show
 ```
 
-If output is empthy then swap is not enabled. If swap is enabled run the following command to disable swap immediately:
+If output is empty then swap is not enabled. If swap is enabled run the following command to disable swap immediately:
 
-```
+```bash
 sudo swapoff -a
 ```
 
@@ -47,20 +45,20 @@ sudo swapoff -a
 
 ### Download and Install Worker Binaries
 
-```
+```bash
 wget -q --show-progress --https-only --timestamping \
-  https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.18.0/crictl-v1.18.0-linux-amd64.tar.gz \
+  https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.20.0/crictl-v1.20.0-linux-amd64.tar.gz \
   https://github.com/opencontainers/runc/releases/download/v1.0.0-rc91/runc.amd64 \
   https://github.com/containernetworking/plugins/releases/download/v0.8.6/cni-plugins-linux-amd64-v0.8.6.tgz \
   https://github.com/containerd/containerd/releases/download/v1.3.6/containerd-1.3.6-linux-amd64.tar.gz \
-  https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubectl \
-  https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kube-proxy \
-  https://storage.googleapis.com/kubernetes-release/release/v1.18.6/bin/linux/amd64/kubelet
+  https://storage.googleapis.com/kubernetes-release/release/v1.20.0/bin/linux/amd64/kubectl \
+  https://storage.googleapis.com/kubernetes-release/release/v1.20.0/bin/linux/amd64/kube-proxy \
+  https://storage.googleapis.com/kubernetes-release/release/v1.20.0/bin/linux/amd64/kubelet
 ```
 
 Create the installation directories:
 
-```
+```bash
 sudo mkdir -p \
   /etc/cni/net.d \
   /opt/cni/bin \
@@ -72,31 +70,29 @@ sudo mkdir -p \
 
 Install the worker binaries:
 
-```
-{
+```bash
   mkdir containerd
-  tar -xvf crictl-v1.18.0-linux-amd64.tar.gz
+  tar -xvf crictl-v1.20.0-linux-amd64.tar.gz
   tar -xvf containerd-1.3.6-linux-amd64.tar.gz -C containerd
   sudo tar -xvf cni-plugins-linux-amd64-v0.8.6.tgz -C /opt/cni/bin/
   sudo mv runc.amd64 runc
   chmod +x crictl kubectl kube-proxy kubelet runc 
   sudo mv crictl kubectl kube-proxy kubelet runc /usr/local/bin/
   sudo mv containerd/bin/* /bin/
-}
 ```
 
 ### Configure CNI Networking
 
 Retrieve the Pod CIDR range for the current compute instance:
 
-```
+```bash
 POD_CIDR=$(curl -s -H "Metadata-Flavor: Google" \
   http://metadata.google.internal/computeMetadata/v1/instance/attributes/pod-cidr)
 ```
 
 Create the `bridge` network configuration file:
 
-```
+```bash
 cat <<EOF | sudo tee /etc/cni/net.d/10-bridge.conf
 {
     "cniVersion": "0.3.1",
@@ -118,7 +114,7 @@ EOF
 
 Create the `loopback` network configuration file:
 
-```
+```bash
 cat <<EOF | sudo tee /etc/cni/net.d/99-loopback.conf
 {
     "cniVersion": "0.3.1",
@@ -132,11 +128,11 @@ EOF
 
 Create the `containerd` configuration file:
 
-```
+```bash
 sudo mkdir -p /etc/containerd/
 ```
 
-```
+```bash
 cat << EOF | sudo tee /etc/containerd/config.toml
 [plugins]
   [plugins.cri.containerd]
@@ -150,7 +146,7 @@ EOF
 
 Create the `containerd.service` systemd unit file:
 
-```
+```bash
 cat <<EOF | sudo tee /etc/systemd/system/containerd.service
 [Unit]
 Description=containerd container runtime
@@ -176,17 +172,15 @@ EOF
 
 ### Configure the Kubelet
 
-```
-{
+```bash
   sudo mv ${HOSTNAME}-key.pem ${HOSTNAME}.pem /var/lib/kubelet/
   sudo mv ${HOSTNAME}.kubeconfig /var/lib/kubelet/kubeconfig
   sudo mv ca.pem /var/lib/kubernetes/
-}
 ```
 
 Create the `kubelet-config.yaml` configuration file:
 
-```
+```bash
 cat <<EOF | sudo tee /var/lib/kubelet/kubelet-config.yaml
 kind: KubeletConfiguration
 apiVersion: kubelet.config.k8s.io/v1beta1
@@ -214,7 +208,7 @@ EOF
 
 Create the `kubelet.service` systemd unit file:
 
-```
+```bash
 cat <<EOF | sudo tee /etc/systemd/system/kubelet.service
 [Unit]
 Description=Kubernetes Kubelet
@@ -242,13 +236,13 @@ EOF
 
 ### Configure the Kubernetes Proxy
 
-```
+```bash
 sudo mv kube-proxy.kubeconfig /var/lib/kube-proxy/kubeconfig
 ```
 
 Create the `kube-proxy-config.yaml` configuration file:
 
-```
+```bash
 cat <<EOF | sudo tee /var/lib/kube-proxy/kube-proxy-config.yaml
 kind: KubeProxyConfiguration
 apiVersion: kubeproxy.config.k8s.io/v1alpha1
@@ -261,7 +255,7 @@ EOF
 
 Create the `kube-proxy.service` systemd unit file:
 
-```
+```bash
 cat <<EOF | sudo tee /etc/systemd/system/kube-proxy.service
 [Unit]
 Description=Kubernetes Kube Proxy
@@ -280,12 +274,10 @@ EOF
 
 ### Start the Worker Services
 
-```
-{
+```bash
   sudo systemctl daemon-reload
   sudo systemctl enable containerd kubelet kube-proxy
   sudo systemctl start containerd kubelet kube-proxy
-}
 ```
 
 > Remember to run the above commands on each worker node: `worker-0`, `worker-1`, and `worker-2`.
@@ -296,14 +288,14 @@ EOF
 
 List the registered Kubernetes nodes:
 
-```
+```bash
 gcloud compute ssh controller-0 \
   --command "kubectl get nodes --kubeconfig admin.kubeconfig"
 ```
 
 > output
 
-```
+```bash
 NAME       STATUS   ROLES    AGE   VERSION
 worker-0   Ready    <none>   24s   v1.18.6
 worker-1   Ready    <none>   24s   v1.18.6
